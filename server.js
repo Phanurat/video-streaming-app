@@ -14,6 +14,15 @@ app.use("/thumbnails", express.static(path.join(__dirname, "thumbnails")));
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
+function apiKeyMiddleware(req, res, next) {
+  const apiKey = req.headers['x-api-key'];
+  if (!apiKey || apiKey !== process.env.API_KEY) {
+    return res.status(401).json({ error: "Missing or invalid API key" });
+  }
+  next();
+}
+
+
 // DB setup
 const dbPath = path.join(__dirname, "db", "database.sqlite");
 if(!fs.existsSync(path.dirname(dbPath))) fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -131,61 +140,66 @@ app.post("/videos/:id/delete", (req,res)=>{
 
 // --- API ---
 // Video list
-app.get("/api/videos", (req,res)=>{
-  db.all("SELECT id,title,thumbnail FROM videos ORDER BY created_at DESC", [], (err, rows)=>{
-    if(err) return res.status(500).json({error: err.message});
-    rows.forEach(r=>{
+// Get all videos (Protected)
+app.get("/api/videos", apiKeyMiddleware, (req, res) => {
+  db.all("SELECT id,title,thumbnail FROM videos ORDER BY created_at DESC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    rows.forEach(r => {
       r.thumbnail_url = `/api/videos/${r.id}/thumb`;
-      r.stream_url = `/api/videos/${r.id}/stream`;
+      r.stream_url = `/api/videos/${r.id}/stream`; // ใช้ได้เลย
     });
+
     res.json(rows);
   });
 });
 
-// Video metadata
-app.get("/api/videos/:id", (req,res)=>{
+// Get thumbnail (Protected)
+app.get("/api/videos/:id/thumb", apiKeyMiddleware, (req, res) => {
   const id = req.params.id;
-  db.get("SELECT * FROM videos WHERE id=?", [id], (err,row)=>{
-    if(err) return res.status(500).json({error:err.message});
-    if(!row) return res.status(404).json({error:"Video not found"});
-    row.stream_url = `/api/videos/${row.id}/stream`;
-    row.thumbnail_url = `/api/videos/${row.id}/thumb`;
-    res.json(row);
-  });
+  const file = path.join(__dirname, "thumbnails", `${id}.jpg`);
+  res.sendFile(file);
 });
 
+
 // Video streaming
-app.get("/api/videos/:id/stream", (req,res)=>{
+// Video Streaming (NO API KEY)
+app.get("/api/videos/:id/stream", (req, res) => {
   const id = req.params.id;
-  db.get("SELECT filename FROM videos WHERE id=?", [id], (err,row)=>{
-    if(err) return res.status(500).send(err.message);
-    if(!row) return res.status(404).send("Video not found");
 
-    const videoPath = path.join(__dirname,"videos", row.filename);
-    if(!fs.existsSync(videoPath)) return res.status(404).send("File missing");
+  db.get("SELECT filename FROM videos WHERE id=?", [id], (err, row) => {
+    if (err || !row) return res.status(404).json({ error: "Video not found" });
 
-    const stat = fs.statSync(videoPath);
-    const fileSize = stat.size;
-    const range = req.headers.range;
-    if(!range) return res.status(400).send("Requires Range header");
+    const videoPath = path.join(__dirname, "videos", row.filename);
 
-    const CHUNK_SIZE = 1e6;
-    const start = Number(range.replace(/\D/g,""));
-    const end = Math.min(start+CHUNK_SIZE, fileSize-1);
+    fs.stat(videoPath, (err, stats) => {
+      if (err) return res.status(404).json({ error: "File missing" });
 
-    res.writeHead(206,{
-      "Content-Range": `bytes ${start}-${end}/${fileSize}`,
-      "Accept-Ranges": "bytes",
-      "Content-Length": end-start+1,
-      "Content-Type": "video/mp4"
+      const range = req.headers.range;
+      if (!range) {
+        return res.status(416).send("Range header required");
+      }
+
+      const videoSize = stats.size;
+      const chunkSize = 10 ** 6; // 1MB chunk
+      const start = Number(range.replace(/\D/g, ""));
+      const end = Math.min(start + chunkSize, videoSize - 1);
+
+      const headers = {
+        "Content-Range": `bytes ${start}-${end}/${videoSize}`,
+        "Accept-Ranges": "bytes",
+        "Content-Length": end - start + 1,
+        "Content-Type": "video/mp4",
+      };
+
+      res.writeHead(206, headers);
+      fs.createReadStream(videoPath, { start, end }).pipe(res);
     });
-
-    fs.createReadStream(videoPath,{start,end}).pipe(res);
   });
 });
 
 // Thumbnail API
-app.get("/api/videos/:id/thumb", (req,res)=>{
+app.get("/api/videos/:id/thumb",apiKeyMiddleware, (req,res)=>{
   const id = req.params.id;
   db.get("SELECT thumbnail FROM videos WHERE id=?", [id], (err,row)=>{
     if(err) return res.status(500).send(err.message);
