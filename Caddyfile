@@ -1,0 +1,15 @@
+# subdomain สำหรับ video-streaming-app
+api.jav789vk.com {
+    reverse_proxy video-app:4000
+    tls /etc/caddy/certs/mydomain.crt /etc/caddy/certs/mydomain.key
+    encode gzip
+
+    log {
+        output file /data/access.log {
+            roll_size 10mb
+            roll_keep 5
+            roll_keep_for 336h
+        }
+        format console
+    }
+}

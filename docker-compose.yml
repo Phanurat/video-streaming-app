@@ -1,22 +1,39 @@
-version: '3.8'
+version: "3.8"
 
 networks:
   app-network:
     driver: bridge
 
 services:
-  api:
-    build: .
+  video-app:
+    build: ./video-streaming-app
     container_name: video-streaming-app
-    ports:
-      - "4000:4000"
-    env_file:
-      - .env
+    expose:
+      - "4000"
     volumes:
-      - ./:/usr/src/app
+      - ./video-streaming-app:/usr/src/app:cached
       - /usr/src/app/node_modules
+    env_file:
+      - ./video-streaming-app/.env
     networks:
       - app-network
     restart: unless-stopped
 
-    
+  caddy:
+    image: caddy:2
+    container_name: caddy-video
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./certs:/etc/caddy/certs   # ใส่ certificate ของคุณเอง
+    networks:
+      - app-network
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
