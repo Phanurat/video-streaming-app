@@ -7,7 +7,13 @@
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 text-gray-200 p-6">
-<h1 class="text-2xl mb-4">Video List</h1>
+
+<!-- Header: Title + Logout -->
+<div class="flex justify-between items-center mb-4">
+  <h1 class="text-2xl">Video List</h1>
+  <a href="/logout" class="px-4 py-2 bg-red-600 rounded hover:bg-red-500 transition font-semibold">Logout</a>
+</div>
+
 <a href="/add" class="px-4 py-2 bg-cyan-600 rounded hover:bg-cyan-500 mb-4 inline-block">Add Video</a>
 
 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -16,7 +22,7 @@
     <img src="<%= v.thumbnail ? '/thumbnails/' + v.thumbnail : '/placeholder.png' %>" class="w-full h-48 object-cover rounded">
     <h2 class="mt-2 text-lg font-bold"><%= v.title %></h2>
     <a href="/player/<%= v.id %>" class="text-cyan-400 hover:underline">API video</a>
-    <a href="/thumbnails/<%=v.thumbnail  %>" class="text-cyan-400 hover:underline">API thumbnail</a>
+    <a href="/thumbnails/<%=v.thumbnail  %>" class="text-cyan-400 hover:underline ml-2">API thumbnail</a>
     <a href="/videos/<%= v.id %>/edit" class="text-yellow-400 hover:underline ml-2">Edit</a>
     <form action="/videos/<%= v.id %>/delete" method="POST" class="inline">
       <button type="submit" class="text-red-500 hover:underline ml-2">Delete</button>
