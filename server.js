@@ -12,7 +12,7 @@ const app = express();
 
 // ---------------- Session ----------------
 app.use(session({
-  secret: "verysecretkey",
+  secret: process.env.SESSION_SECRET || "default_fallback_key", 
   resave: false,
   saveUninitialized: false,
   cookie: { maxAge: 24 * 60 * 60 * 1000 }
